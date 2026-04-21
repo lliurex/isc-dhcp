@@ -1,4 +1,4 @@
-isc-dhcp (4.4.3-P1-4ubuntu2.1) noble; urgency=medium
+isc-dhcp (4.4.3-P1-4ubuntu2-lliurex1) noble; urgency=medium
 
   * Fixed apparmor file
 
