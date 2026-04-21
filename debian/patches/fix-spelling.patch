@@ -1,0 +1,38 @@
+Description: fix spelling mistakes
+Author: Michael Gilbert <mgilbert@debian.org>
+
+Index: isc-dhcp/common/parse.c
+===================================================================
+--- isc-dhcp.orig/common/parse.c
++++ isc-dhcp/common/parse.c
+@@ -2402,7 +2402,7 @@ int parse_executable_statement (result,
+ 
+ 			token = next_token (&val, (unsigned *)0, cfile);
+ 			if (token != RBRACE) {
+-				parse_warn (cfile, "expecting rigt brace.");
++				parse_warn (cfile, "expecting right brace.");
+ 				goto badx;
+ 			}
+ 		} else {
+Index: isc-dhcp/server/dhcpd.conf.5
+===================================================================
+--- isc-dhcp.orig/server/dhcpd.conf.5
++++ isc-dhcp/server/dhcpd.conf.5
+@@ -2839,7 +2839,7 @@ pool usage passes that level.  After tha
+ output until the pool usage falls below the low threshold.  If the low
+ threshold is not given, it default to a value of zero.
+ .PP
+-A special case occurs when the low threshold is set to be higer than
++A special case occurs when the low threshold is set to be higher than
+ the high threshold.  In this case, a message will be generated each time
+ a lease is acknowledged when the pool usage is above the high threshold.
+ .PP
+@@ -3021,7 +3021,7 @@ response \fIis\fR heard, the lease is ab
+ not respond to the client.  The lease will remain abandoned for a minimum
+ of abandon-lease-time seconds.
+ .PP
+-If a there are no free addressses but there are abandoned IP addresses, the
++If a there are no free addresses but there are abandoned IP addresses, the
+ DHCP server will attempt to reclaim an abandoned IP address regardless of the
+ value of abandon-lease-time.
+ .PP

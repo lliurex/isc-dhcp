@@ -1,0 +1,78 @@
+From: Steve Langasek <steve.langasek@ubuntu.com>
+Subject: Increase default timeout to ensure we don't hit it
+Bug-Ubuntu: https://launchpad.net/bugs/838968
+
+In some cases, the 60 second client timeout has been shown to be too
+low, resulting in ifupdown declaring an interface as 'up' when in fact
+the dhclient has simply backgrounded to continue trying.  This is
+addressed in ifupdown by calling dhclient3 with -1 (exit non-zero
+after the timeout), but we don't ever want to *reach* that timeout:
+having an interface fail to come up and never be retried is only
+slightly better than having ifup say the interface is up before it is.
+Now that ifup's dhclient handling is both reliable and highly
+parallelized, we can afford to wait longer to be sure we don't hit
+the timeout when DHCP is really working, so do this by default.
+
+---
+ client/clparse.c                |    2 +-
+ client/dhclient.conf.5          |    4 ++--
+ doc/ja_JP.eucJP/dhclient.conf.5 |    4 ++--
+ 3 files changed, 5 insertions(+), 5 deletions(-)
+
+Index: isc-dhcp-4.4.3-2ubuntu1/client/clparse.c
+===================================================================
+--- isc-dhcp-4.4.3-2ubuntu1.orig/client/clparse.c
++++ isc-dhcp-4.4.3-2ubuntu1/client/clparse.c
+@@ -167,7 +167,7 @@
+ 	memset (&top_level_config, 0, sizeof top_level_config);
+ 
+ 	/* Set some defaults... */
+-	top_level_config.timeout = 60;
++	top_level_config.timeout = 300;
+ 	top_level_config.select_interval = 0;
+ 	top_level_config.reboot_timeout = 10;
+ 	top_level_config.retry_interval = 300;
+Index: isc-dhcp-4.4.3-2ubuntu1/client/dhclient.conf.5
+===================================================================
+--- isc-dhcp-4.4.3-2ubuntu1.orig/client/dhclient.conf.5
++++ isc-dhcp-4.4.3-2ubuntu1/client/dhclient.conf.5
+@@ -69,7 +69,7 @@
+ statement determines the amount of time that must pass between the
+ time that the client begins to try to determine its address and the
+ time that it decides that it's not going to be able to contact a
+-server.  By default, this timeout is sixty seconds.  After the
++server.  By default, this timeout is 300 seconds.  After the
+ timeout has passed, if there are any static leases defined in the
+ configuration file, or any leases remaining in the lease database that
+ have not yet expired, the client will loop through these leases
+@@ -747,7 +747,7 @@
+ 
+ .nf
+ 
+-timeout 60;
++timeout 300;
+ retry 60;
+ reboot 10;
+ select-timeout 5;
+Index: isc-dhcp-4.4.3-2ubuntu1/doc/ja_JP.eucJP/dhclient.conf.5
+===================================================================
+--- isc-dhcp-4.4.3-2ubuntu1.orig/doc/ja_JP.eucJP/dhclient.conf.5
++++ isc-dhcp-4.4.3-2ubuntu1/doc/ja_JP.eucJP/dhclient.conf.5
+@@ -70,7 +70,7 @@
+ ʸ�ϡ����饤����Ȥ����ɥ쥹������ߤ򳫻Ϥ��Ƥ��顢
+ �����Ф˥����������뤳�Ȥ�
+ �Ǥ��ʤ���Ƚ�Ǥ���ޤǤ˷в᤹�٤����֤���ޤ���
+-�ǥե���ȤǤϤ��Υ����ॢ�����ͤ� 60 �äǤ���
++�ǥե���ȤǤϤ��Υ����ॢ�����ͤ� 300 �äǤ���
+ ���Υ����ॢ�����ͤ��᤮����ϡ�
+ �⤷��Ū�ʥ꡼��������ե�������������Ƥ��뤫��
+ �꡼���ǡ����١����ˤޤ������ڤ�ˤʤäƤ��ʤ��꡼�����ĤäƤ���С�
+@@ -576,7 +576,7 @@
+ 
+ .nf
+ 
+-timeout 60;
++timeout 300;
+ retry 60;
+ reboot 10;
+ select-timeout 5;

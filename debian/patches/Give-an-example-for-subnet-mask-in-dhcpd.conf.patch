@@ -1,0 +1,21 @@
+From: Martin Pitt <martin.pitt@ubuntu.com>
+Date: Fri, 5 May 2006 19:23:28 +0200
+Subject: Give an example for subnet-mask in dhcpd.conf
+
+LP: #26661
+---
+ server/dhcpd.conf.example | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/server/dhcpd.conf.example b/server/dhcpd.conf.example
+index 7c6eeea..2ef36a6 100644
+--- a/server/dhcpd.conf.example
++++ b/server/dhcpd.conf.example
+@@ -51,6 +51,7 @@ ddns-update-style none;
+ #  range 10.5.5.26 10.5.5.30;
+ #  option domain-name-servers ns1.internal.example.org;
+ #  option domain-name "internal.example.org";
++#  option subnet-mask 255.255.255.224;
+ #  option routers 10.5.5.1;
+ #  option broadcast-address 10.5.5.31;
+ #  default-lease-time 600;

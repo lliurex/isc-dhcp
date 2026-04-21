@@ -1,0 +1,14 @@
+Index: isc-dhcp-4.3.5-3ubuntu1/server/dhcpd.conf.example
+===================================================================
+--- isc-dhcp-4.3.5-3ubuntu1.orig/server/dhcpd.conf.example
++++ isc-dhcp-4.3.5-3ubuntu1/server/dhcpd.conf.example
+@@ -2,6 +2,9 @@
+ #
+ # Sample configuration file for ISC dhcpd
+ #
++# Attention: If /etc/ltsp/dhcpd.conf exists, that will be used as
++# configuration file instead of this file.
++#
+ 
+ # option definitions common to all supported networks...
+ option domain-name "example.org";

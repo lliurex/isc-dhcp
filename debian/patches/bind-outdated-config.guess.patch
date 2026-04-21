@@ -1,0 +1,26 @@
+From: Steve Langasek <steve.langasek@ubuntu.com>
+Date: Fri, 24 Nov 2023 02:45:58 +0100
+Subject: run autoreconf in the bind directory
+
+Using an embedded version of old bind libraries instead of having to ship
+those as a separate source package in the archive is fine, but then we
+shouldn't use 9-year-old config.{guess,sub} that don't know about current
+architectures and cause build failures.
+
+Forwarded: no
+---
+ bind/Makefile.in | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/bind/Makefile.in b/bind/Makefile.in
+index c5b0ee6..2b04df2 100644
+--- a/bind/Makefile.in
++++ b/bind/Makefile.in
+@@ -57,6 +57,7 @@ bind1:
+ 		echo Configuring BIND libraries for DHCP. ;             \
+ 		rm -rf ${cleandirs} ${cleanfiles} ;                     \
+ 		(cd ${bindsrcdir} &&                                    \
++		 autoreconf -i -f &&					\
+                  ./configure ${bindconfig} > ${binddir}/configure.log); \
+ 	fi
+ 

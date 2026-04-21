@@ -1,0 +1,175 @@
+From: Jiri Popelka <jpopelka@redhat.com>
+Date: Fri, 24 Nov 2023 02:45:58 +0100
+Subject: Added broadcast flag support without config options
+
+From file called dhcp-4.2.4-dhclient-options-changed.patch I have
+backported only the parts responsible for the token:
+
+    BOOTP_BROADCAST_ALWAYS
+
+set specifically by keyword: "bootp-broadcast-always" in dhcp
+client config file. I removed all extra cmdline options added
+by the same commit. They would change cmdline behavior adding
+extra parameters (good for IB tests, not suitable for a SRU).
+
+When backporting file called dhcp-4.2.5-lpf-ib.patch the following
+statement was not backported:
+
+    ip->client->config->bootp_broadcast_always = 1;
+
+when setting ib interface up, since the entire broadcast was
+thought not to be mandatory.
+
+Unfortunately, from:
+
+ * RFC 4390 (https://tools.ietf.org/html/rfc4390)
+ * Dynamic Host Configuration Protocol (DHCP) over InfiniBand
+
+"""
+2.2. Use of the BROADCAST flag
+
+   A DHCP client on IPoIB MUST set the BROADCAST flag in DHCPDISCOVER
+   and DHCPREQUEST messages (and set "ciaddr" to zero) to ensure that
+   the server (or the relay agent) broadcasts its reply to the client.
+
+   Note: As described in [RFC2131], "ciaddr" MUST be filled in with the
+         client's IP address during BOUND, RENEWING or REBINDING states;
+         therefore, the BROADCAST flag MUST NOT be set. In these cases,
+         the DHCP server unicasts DHCPACK message to the address in
+         "ciaddr". The link address will be resolved by ARP.
+"""
+
+The BROADCAST flag for InfiniBand DHCP REQUEST packets MUST be turned on
+(MUST is used in RFC) AND this has to be backported to fix wrong behavior.
+
+Origin: git://pkgs.fedoraproject.org/dhcp.git, tag: dhcp-4.2.5-30.fc20
+Bug-Ubuntu: https://launchpad.net/bugs/1529815
+Signed-off-by: Rafael David Tinoco <rafael.tinoco@canonical.com>
+---
+ client/clparse.c    | 10 +++++++++-
+ client/dhclient.c   | 12 +++++++++---
+ common/conflex.c    |  2 ++
+ includes/dhcpd.h    |  3 +++
+ includes/dhctoken.h |  3 ++-
+ 5 files changed, 25 insertions(+), 5 deletions(-)
+
+diff --git a/client/clparse.c b/client/clparse.c
+index a93f3e7..e4d6e0f 100644
+--- a/client/clparse.c
++++ b/client/clparse.c
+@@ -192,6 +192,7 @@ isc_result_t read_client_conf ()
+ 	/* Requested lease time, used by DHCPv6 (DHCPv4 uses the option cache)
+ 	 */
+ 	top_level_config.requested_lease = 7200;
++	top_level_config.bootp_broadcast_always = 0;
+ 
+ 	group_allocate (&top_level_config.on_receipt, MDL);
+ 	if (!top_level_config.on_receipt)
+@@ -397,7 +398,8 @@ void read_client_leases ()
+ 	interface-declaration |
+ 	LEASE client-lease-statement |
+ 	ALIAS client-lease-statement |
+-	KEY key-definition */
++	KEY key-definition |
++	BOOTP_BROADCAST_ALWAYS */
+ 
+ void parse_client_statement (cfile, ip, config)
+ 	struct parse *cfile;
+@@ -821,6 +823,12 @@ void parse_client_statement (cfile, ip, config)
+ 		break;
+ 
+ 
++	      case BOOTP_BROADCAST_ALWAYS:
++		token = next_token(&val, (unsigned*)0, cfile);
++		config -> bootp_broadcast_always = 1;
++		parse_semi (cfile);
++		return;
++
+ 	      default:
+ 		lose = 0;
+ 		stmt = (struct executable_statement *)0;
+diff --git a/client/dhclient.c b/client/dhclient.c
+index f8c93aa..9bffcde 100644
+--- a/client/dhclient.c
++++ b/client/dhclient.c
+@@ -1221,6 +1221,9 @@ static void setup_ib_interface(struct interface_info *ip)
+ 	isc_result_t status;
+ 	struct parse *cfile = (struct parse *)0;
+ 
++	/* Set the broadcast flag */
++	ip->client->config->bootp_broadcast_always = 1;
++
+ 	/*
+ 	 * Find out if a dhcp-client-identifier option was specified either
+ 	 * in the config file or on the command line
+@@ -3604,7 +3607,8 @@ void make_discover (client, lease)
+ 	client -> packet.xid = random ();
+ 	client -> packet.secs = 0; /* filled in by send_discover. */
+ 
+-	if (can_receive_unicast_unconfigured (client -> interface))
++	if ((!(client->config->bootp_broadcast_always))
++	    && can_receive_unicast_unconfigured(client->interface))
+ 		client -> packet.flags = 0;
+ 	else
+ 		client -> packet.flags = htons (BOOTP_BROADCAST);
+@@ -3689,7 +3693,8 @@ void make_request (client, lease)
+ 	} else {
+ 		memset (&client -> packet.ciaddr, 0,
+ 			sizeof client -> packet.ciaddr);
+-		if (can_receive_unicast_unconfigured (client -> interface))
++		if ((!(client ->config->bootp_broadcast_always)) &&
++		    can_receive_unicast_unconfigured (client -> interface))
+ 			client -> packet.flags = 0;
+ 		else
+ 			client -> packet.flags = htons (BOOTP_BROADCAST);
+@@ -3752,7 +3757,8 @@ void make_decline (client, lease)
+ 	client -> packet.hops = 0;
+ 	client -> packet.xid = client -> xid;
+ 	client -> packet.secs = 0; /* Filled in by send_request. */
+-	if (can_receive_unicast_unconfigured (client -> interface))
++	if ((!(client->config-> bootp_broadcast_always))
++	    && can_receive_unicast_unconfigured (client->interface))
+ 		client -> packet.flags = 0;
+ 	else
+ 		client -> packet.flags = htons (BOOTP_BROADCAST);
+diff --git a/common/conflex.c b/common/conflex.c
+index 8b01dfb..1fa2be3 100644
+--- a/common/conflex.c
++++ b/common/conflex.c
+@@ -832,6 +832,8 @@ intern(char *atom, enum dhcp_token dfv) {
+ 		if (!strcasecmp(atom+1, "ig-endian")) {
+ 			return TOKEN_BIG_ENDIAN;
+ 		}
++		if (!strcasecmp (atom + 1, "ootp-broadcast-always"))
++			return BOOTP_BROADCAST_ALWAYS;
+ 		break;
+ 	      case 'c':
+ 		if (!strcasecmp(atom + 1, "ase"))
+diff --git a/includes/dhcpd.h b/includes/dhcpd.h
+index 46ddd04..0cb5a9f 100644
+--- a/includes/dhcpd.h
++++ b/includes/dhcpd.h
+@@ -1284,6 +1284,9 @@ struct client_config {
+ 
+ 	int lease_id_format;		/* format for IDs in lease file,
+ 					   TOKEN_OCTAL or TOKEN_HEX */
++
++	int bootp_broadcast_always;	/* If nonzero, always set the BOOTP_BROADCAST
++					   flag in requests */
+ };
+ 
+ /* Per-interface state used in the dhcp client... */
+diff --git a/includes/dhctoken.h b/includes/dhctoken.h
+index e6d125f..2675254 100644
+--- a/includes/dhctoken.h
++++ b/includes/dhctoken.h
+@@ -377,7 +377,8 @@ enum dhcp_token {
+ 	TOKEN_HEX = 677,
+ 	TOKEN_OCTAL = 678,
+ 	KEY_ALGORITHM = 679,
+-	DISCONNECT = 680
++	DISCONNECT = 680,
++	BOOTP_BROADCAST_ALWAYS = 681
+ };
+ 
+ #define is_identifier(x)	((x) >= FIRST_TOKEN &&	\

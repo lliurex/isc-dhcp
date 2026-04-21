@@ -1,0 +1,9 @@
+dhclient sbin
+
+debian/dhclient.conf etc/dhcp
+
+debian/debug etc/dhcp
+
+debian/apparmor/sbin.dhclient etc/apparmor.d
+debian/resolved-enter etc/dhcp/dhclient-enter-hooks.d/
+debian/resolved etc/dhcp/dhclient-exit-hooks.d/

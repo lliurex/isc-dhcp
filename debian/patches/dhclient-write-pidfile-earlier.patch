@@ -1,0 +1,38 @@
+From: Michael Hudson-Doyle <michael.hudson@ubuntu.com>
+Date: Fri, 24 Nov 2023 02:45:58 +0100
+Subject: write the client pidfile before informing parent of success
+
+dhclient (by default) forks and waits for the child process to report its
+success/failure via a pipe. The child writes to the pipe before writing the
+pidfile, meaning the parent can exit before the pidfile is present, which
+breaks the attempt to kill dhclient process run in the initramfs to handle
+ip=dhcp.
+
+Bug-Ubuntu: https://bugs.launchpad.net/bugs/1819747
+Forwarded: no
+---
+ client/dhclient.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/client/dhclient.c b/client/dhclient.c
+index 9bffcde..df0f1fe 100644
+--- a/client/dhclient.c
++++ b/client/dhclient.c
+@@ -4837,6 +4837,8 @@ void detach ()
+ 	if (dfd[0] == -1 || dfd[1] == -1)
+ 		return;
+ 
++	write_client_pid_file ();
++
+ 	/* Signal parent we started successfully. */
+ 	if (write(dfd[1], &buf, 1) != 1)
+ 		log_fatal("write to parent: %m");
+@@ -4859,8 +4861,6 @@ void detach ()
+ 	(void) open("/dev/null", O_RDWR);
+ 	(void) open("/dev/null", O_RDWR);
+ 
+-	write_client_pid_file ();
+-
+ 	IGNORE_RET (chdir("/"));
+ 
+ }

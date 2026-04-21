@@ -1,0 +1,83 @@
+From: Jiri Popelka <jpopelka@redhat.com>
+Date: Fri, 24 Nov 2023 02:45:58 +0100
+Subject: Infiniband support
+
+Origin: git://pkgs.fedoraproject.org/dhcp.git, tag: dhcp-4.3.1-18.fc22
+Bug-Ubuntu: https://launchpad.net/bugs/1401141
+---
+ client/dhclient.c | 48 ++++++++++++++++++++++++++++++++++++++++++++++--
+ 1 file changed, 46 insertions(+), 2 deletions(-)
+
+diff --git a/client/dhclient.c b/client/dhclient.c
+index da47ee0..3bd5ee2 100644
+--- a/client/dhclient.c
++++ b/client/dhclient.c
+@@ -53,6 +53,13 @@ const char *path_dhclient_duid = NULL;
+ 
+ static void add_to_tail(struct client_lease** lease_list, struct client_lease* lease);
+ 
++/* Default Prefix */
++static unsigned char default_prefix[12] = {
++	0xff, 0x00, 0x00, 0x00,
++	0x00, 0x00, 0x02, 0x00,
++	0x00, 0x02, 0xc9, 0x00
++};
++
+ /* False (default) => we write and use a pid file */
+ isc_boolean_t no_pid_file = ISC_FALSE;
+ 
+@@ -1207,6 +1214,12 @@ int find_subnet (struct subnet **sp,
+ static void setup_ib_interface(struct interface_info *ip)
+ {
+ 	struct group *g;
++	struct hardware *hw = &ip->hw_address;
++	char client_id[64];
++	char *arg_conf = NULL;
++	int arg_conf_len = 0;
++	isc_result_t status;
++	struct parse *cfile = (struct parse *)0;
+ 
+ 	/*
+ 	 * Find out if a dhcp-client-identifier option was specified either
+@@ -1220,8 +1233,39 @@ static void setup_ib_interface(struct interface_info *ip)
+ 		}
+ 	}
+ 
+-	/* No client ID specified */
+-	log_fatal("dhcp-client-identifier must be specified for InfiniBand");
++	/*
++	 * No client ID specified, make up one based on a default
++	 * "prefix" and the port GUID.
++	 *
++	 * NOTE: This is compatible with what gpxe does.
++	 */
++	sprintf(client_id, "%.2x:%.2x:%.2x:%.2x:%.2x:%.2x:%.2x:%.2x:%.2x:%.2x:%.2x:%.2x:%.2x:%.2x:%.2x:%.2x:%.2x:%.2x:%.2x:%.2x",
++		default_prefix[0], default_prefix[1], default_prefix[2],
++		default_prefix[3], default_prefix[4], default_prefix[5],
++		default_prefix[6], default_prefix[7], default_prefix[8],
++		default_prefix[9], default_prefix[10], default_prefix[11],
++		hw->hbuf[1], hw->hbuf[2], hw->hbuf[3], hw->hbuf[4],
++		hw->hbuf[5], hw->hbuf[6], hw->hbuf[7], hw->hbuf[8]);
++
++	arg_conf_len = asprintf(&arg_conf,
++				"send dhcp-client-identifier %s;",
++				client_id);
++
++	if ((arg_conf == 0) || (arg_conf_len <= 0))
++		log_fatal("Unable to send option dhcp-client-identifier");
++
++	status = new_parse(&cfile, -1, arg_conf, arg_conf_len,
++			   "Automatic Infiniband client identifier", 0);
++
++	if ((status != ISC_R_SUCCESS) || (cfile->warnings_occurred))
++		log_fatal("Failed to parse Infiniband client identifier");
++
++	parse_client_statement(cfile, NULL, ip->client->config);
++
++	if (cfile->warnings_occurred)
++		log_fatal("Failed to parse Infiniband client identifier");
++
++	end_parse(&cfile);
+ }
+ 
+ /* Individual States:
