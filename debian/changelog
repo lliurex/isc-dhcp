@@ -1,3 +1,9 @@
+isc-dhcp (4.4.3-P1-4ubuntu2-lliurex1) noble; urgency=medium
+
+  * Fixed apparmor file
+
+ -- Hector Garcia Huerta <hectorgh@gmail.com>  Tue, 21 Apr 2026 12:30:31 +0200
+
 isc-dhcp (4.4.3-P1-4ubuntu2) noble; urgency=high
 
   * No change rebuild against frame pointers and time_t.
